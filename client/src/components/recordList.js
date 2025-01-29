@@ -41,7 +41,7 @@ export default function RecordList() {
 
   useEffect(() => {
     async function getRecords() {
-      const response = await fetch("http://localhost:5050/record/");
+      const response = await fetch(`${process.env.REACT_APP_YOUR_HOSTNAME}/record/`);
       if (!response.ok) {
         console.error(`An error occurred: ${response.statusText}`);
         return;
@@ -53,7 +53,7 @@ export default function RecordList() {
 
   async function deleteRecords(ids) {
     for (const id of ids) {
-      await fetch(`http://localhost:5050/record/${id}`, { method: "DELETE" });
+      await fetch(`${process.env.REACT_APP_YOUR_HOSTNAME}/${id}`, { method: "DELETE" });
     }
     setRecords(records.filter((el) => !ids.includes(el._id)));
   }
@@ -97,7 +97,7 @@ export default function RecordList() {
   const handleConfirmUpload = async () => {
     if (fileData.length === 0) return;
 
-    const response = await fetch("http://localhost:5050/record/multi-insert", {
+    const response = await fetch(`${process.env.REACT_APP_YOUR_HOSTNAME}`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(fileData),
