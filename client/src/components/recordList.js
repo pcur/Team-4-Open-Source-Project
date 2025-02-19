@@ -97,16 +97,13 @@ export default function RecordList() {
   const handleConfirmUpload = async () => {
     if (fileData.length === 0) return;
 
-    const response = await fetch(`${process.env.REACT_APP_YOUR_HOSTNAME}/record/add`, {
+    const response = await fetch(`${process.env.REACT_APP_YOUR_HOSTNAME}`, {
       method: "POST",
-      headers: {
-          "Content-Type": "application/json"
-      },
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify(fileData),
     });
 
     if (response.ok) {
-      console.error("Success")
       setRecords([...records, ...fileData]);
       setShowPreview(false);
       setFileData([]);
@@ -209,14 +206,6 @@ export default function RecordList() {
           </tbody>
         </table>
       </div>
-
-      {/* Delete Selected Button */}
-      <button
-        className="mt-4 border bg-red-500 text-white px-4 py-2 rounded-md"
-        onClick={() => deleteRecords(selectedRecords)}
-      >
-        Delete Selected
-      </button>
     </>
   );
 }
