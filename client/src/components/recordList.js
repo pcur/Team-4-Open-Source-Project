@@ -1,28 +1,26 @@
-import { useEffect, useState } from "react";
-import { Link } from "react-router-dom";
-import * as XLSX from "xlsx";
+import React, { useState, useEffect } from 'react';
+import { Link } from 'react-router-dom';
+import * as XLSX from 'xlsx'; // Library to handle Excel file operations
 
-const Record = (props) => (
+// Component to display each individual record
+const Record = ({ record, deleteRecord, toggleSelect, selected }) => (
   <tr className="border-b transition-colors hover:bg-muted/50">
     <td className="p-4 align-middle">
-      <input
-        type="checkbox"
-        checked={props.selected}
-        onChange={() => props.toggleSelect(props.record._id)}
-      />
+      {/* Checkbox to select a record */}
+      <input type="checkbox" checked={selected} onChange={() => toggleSelect(record._id)} />
     </td>
-    <td className="p-4 align-middle">{props.record.name}</td>
-    <td className="p-4 align-middle">{props.record.position}</td>
-    <td className="p-4 align-middle">{props.record.level}</td>
+    <td className="p-4 align-middle">{record.name}</td>
+    <td className="p-4 align-middle">{record.position}</td>
+    <td className="p-4 align-middle">{record.level}</td>
     <td className="p-4 align-middle">
       <div className="flex gap-2">
-        <Link className="border bg-background hover:bg-slate-100 rounded-md px-3 h-9" to={`/edit/${props.record._id}`}>
-          Edit
-        </Link>
+        {/* Link to edit the record */}
+        <Link className="border bg-background hover:bg-slate-100 rounded-md px-3 h-9" to={`/edit/${record._id}`}>Edit</Link>
+        {/* Button to delete the record */}
         <button
           className="border bg-background hover:bg-red-100 rounded-md px-3 h-9"
           type="button"
-          onClick={() => props.deleteRecord(props.record._id)}
+          onClick={() => deleteRecord(record._id)}
         >
           Delete
         </button>
@@ -32,115 +30,108 @@ const Record = (props) => (
 );
 
 export default function RecordList() {
+  // State to hold the list of records from the database
   const [records, setRecords] = useState([]);
+  // State to hold data extracted from the Excel file
   const [fileData, setFileData] = useState([]);
-  const [showPreview, setShowPreview] = useState(false);
 
+  // Fetch existing records from the server when the component mounts
   useEffect(() => {
-    async function getRecords() {
-      const response = await fetch(`${process.env.REACT_APP_YOUR_HOSTNAME}/record/`);
-      if (!response.ok) {
-        console.error(`An error occurred: ${response.statusText}`);
-        return;
-      }
+    fetchRecords();
+  }, []);
+
+  // Function to fetch records from the backend
+  const fetchRecords = async () => {
+    const response = await fetch(`${process.env.REACT_APP_YOUR_HOSTNAME}/record/`);
+    if (response.ok) {
       setRecords(await response.json());
     }
-    getRecords();
-  }, [records.length]);
-
-
-
-  // Handle Excel Upload
-  const handleFileUpload = (e) => {
-    const file = e.target.files[0];
-    if (!file) return;
-
-    const reader = new FileReader();
-    reader.onload = (event) => {
-      const data = new Uint8Array(event.target.result);
-      const workbook = XLSX.read(data, { type: "array" });
-      const sheet = workbook.Sheets[workbook.SheetNames[0]];
-      const jsonData = XLSX.utils.sheet_to_json(sheet);
-
-      setFileData(jsonData.slice(0, 10)); // Show only first 10 rows for preview
-      setShowPreview(true);
-    };
-    reader.readAsArrayBuffer(file);
   };
 
-  // Insert Data into DB
-  const handleConfirmUpload = async () => {
-    if (fileData.length === 0) return;
+  // Function to handle file upload event and read Excel data
+  const handleFileUpload = (event) => {
+    const file = event.target.files[0];
+    const reader = new FileReader();
 
-    const response = await fetch(`${process.env.REACT_APP_YOUR_HOSTNAME}/record/add`, {
-      method: "POST",
-      headers: {
-          "Content-Type": "application/json"
-      },
-      body: JSON.stringify(fileData),
-    });
+    reader.onload = (e) => {
+      const workbook = XLSX.read(e.target.result, { type: "binary" });
+      const sheetName = workbook.SheetNames[0]; // Read the first sheet from Excel
+      const worksheet = workbook.Sheets[sheetName];
+      // Convert Excel sheet data into JSON format
+      const data = XLSX.utils.sheet_to_json(worksheet, { header: 0 });
+      setFileData(data);
+    };
 
-    if (response.ok) {
-      console.error("Success")
-      setRecords([...records, ...fileData]);
-      setShowPreview(false);
-      setFileData([]);
-    } else {
-      console.error("Error inserting data");
+    reader.readAsBinaryString(file);
+  };
+
+  // Function to import records from fileData into the database individually
+  const importRecords = async () => {
+    for (const record of fileData) {
+      const response = await fetch(`${process.env.REACT_APP_YOUR_HOSTNAME}/record/add`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(record), // Send each record as JSON
+      });
+
+      if (!response.ok) {
+        console.error(`Error adding record: ${response.statusText}`);
+      }
     }
+
+    setFileData([]); // Clear the imported data after uploading
+    fetchRecords(); // Refresh the record list
+  };
+
+  // Function to delete a record from the database
+  const deleteRecord = async (id) => {
+    await fetch(`${process.env.REACT_APP_YOUR_HOSTNAME}/${id}`, { method: "DELETE" });
+    setRecords(records.filter(record => record._id !== id)); // Update the UI after deletion
   };
 
   return (
-    <>
-      <h3 className="text-lg font-semibold p-4">Employee Records</h3>
+    <div>
+      {/* File input for uploading Excel files */}
+      <input type="file" onChange={handleFileUpload} />
+      <button onClick={importRecords}>Import Data</button>
 
-      {/* Upload Excel File */}
-      <div className="p-4">
-        <input type="file" accept=".xlsx, .xls" onChange={handleFileUpload} className="border px-4 py-2 rounded-md" />
-      </div>
-
-      {/* Preview Table */}
-      {showPreview && (
-        <div className="p-4">
-          <h4 className="font-semibold">Preview (First 10 Records)</h4>
-          <table className="border w-full text-sm mt-2">
+      {/* Preview first ten records from uploaded file data */}
+      {fileData.length > 0 && (
+        <div>
+          <h3>Preview of Uploaded Data:</h3>
+          <table>
             <thead>
-              <tr className="border-b">
-                <th className="p-2">Name</th>
-                <th className="p-2">Position</th>
-                <th className="p-2">Level</th>
+              <tr>
+                {Object.keys(fileData[0]).map((header) => (
+                  <th key={header}>{header}</th>
+                ))}
               </tr>
             </thead>
             <tbody>
-              {fileData.map((row, index) => (
-                <tr key={index} className="border-b">
-                  <td className="p-2">{row.name}</td>
-                  <td className="p-2">{row.position}</td>
-                  <td className="p-2">{row.level}</td>
+              {fileData.slice(0, 10).map((record, index) => (
+                <tr key={index}>
+                  {Object.values(record).map((value, idx) => (
+                    <td key={idx}>{value}</td>
+                  ))}
                 </tr>
               ))}
             </tbody>
           </table>
-          <button className="mt-4 bg-green-500 text-white px-4 py-2 rounded-md" onClick={handleConfirmUpload}>
-            Confirm Insert
-          </button>
         </div>
       )}
 
-      {/* Employee Records Table */}
-      <div className="border rounded-lg overflow-hidden">
-        <table className="w-full text-sm">
-          <thead className="border-b">
-            <tr>
-              <th className="px-4 py-2 text-left">Name</th>
-              <th className="px-4 py-2 text-left">Position</th>
-              <th className="px-4 py-2 text-left">Level</th>
-              <th className="px-4 py-2 text-left">Action</th>
-            </tr>
-          </thead>
-        </table>
-      </div>
-
-    </>
+      {/* Table displaying the records */}
+      <table>
+        <tbody>
+          {records.map(record => (
+            <Record
+              key={record._id}
+              record={record}
+              deleteRecord={deleteRecord}
+            />
+          ))}
+        </tbody>
+      </table>
+    </div>
   );
 }
